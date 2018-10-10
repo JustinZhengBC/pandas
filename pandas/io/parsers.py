@@ -480,6 +480,7 @@ _parser_defaults = {
     'names': None,
     'prefix': None,
     'skiprows': None,
+    'skipcomments': False,
     'na_values': None,
     'true_values': None,
     'false_values': None,
@@ -519,6 +520,7 @@ _c_parser_defaults = {
     'na_filter': True,
     'low_memory': True,
     'memory_map': False,
+    'skipcomments': False,
     'error_bad_lines': True,
     'warn_bad_lines': True,
     'tupleize_cols': False,
@@ -545,7 +547,6 @@ _deprecated_args = {
 
 
 def _make_parser_function(name, default_sep=','):
-
     # prepare read_table deprecation
     if name == "read_table":
         sep = False
@@ -573,6 +574,7 @@ def _make_parser_function(name, default_sep=','):
                  false_values=None,
                  skipinitialspace=False,
                  skiprows=None,
+                 skipcomments=False,
                  nrows=None,
 
                  # NA and Missing Data Handling
@@ -665,6 +667,7 @@ def _make_parser_function(name, default_sep=','):
                     names=names,
                     prefix=prefix,
                     skiprows=skiprows,
+                    skipcomments=skipcomments,
                     na_values=na_values,
                     true_values=true_values,
                     false_values=false_values,
@@ -2057,8 +2060,7 @@ class PythonParser(ParserBase):
         self.memory_map = kwds['memory_map']
         self.skiprows = kwds['skiprows']
         self.skiprowsleft = 0
-
-        print(type(self.skiprows))
+        self.skipcomments = kwds['skipcomments']
 
         if callable(self.skiprows):
             self.skipfunc = self.skiprows
@@ -2664,6 +2666,10 @@ class PythonParser(ParserBase):
                 except IndexError:
                     raise StopIteration
         else:
+            while self.skipcomments and self.skipfunc(self.pos):
+                self.pos += 1
+                next(self.data)
+
             while True:
                 orig_line = self._next_iter_line(row_num=self.pos + 1)
                 self.pos += 1
@@ -2673,8 +2679,10 @@ class PythonParser(ParserBase):
                         ret = self._remove_empty_lines([line])
 
                         if ret:
-                            if self.skipfunc(self.pos):
+                            if not self.skipcomments \
+                                and self.skipfunc(self.pos):
                                 continue
+
                             line = ret[0]
                             break
                     elif self._is_line_empty(orig_line) or line:

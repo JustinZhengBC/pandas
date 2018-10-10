@@ -295,6 +295,7 @@ cdef class TextReader:
         object index_col
         object low_memory
         object skiprows
+        object skipcomments
         object dtype
         object encoding
         object compression
