@@ -1014,7 +1014,7 @@ class TextFileReader(BaseIterator):
         if engine != 'c':
             if is_integer(skiprows):
                 skiprows = lrange(skiprows)
-            if skiprows is None:
+            elif skiprows is None:
                 skiprows = set()
             elif not callable(skiprows):
                 skiprows = set(skiprows)
@@ -2056,9 +2056,21 @@ class PythonParser(ParserBase):
         self.compression = kwds['compression']
         self.memory_map = kwds['memory_map']
         self.skiprows = kwds['skiprows']
+        self.skiprowsleft = 0
+
+        print(type(self.skiprows))
 
         if callable(self.skiprows):
             self.skipfunc = self.skiprows
+        elif type(self.skiprows) == list:
+            self.skiprowsleft = len(self.skiprows)
+            def dec_skiprows(x):
+                if self.skiprowsleft == 0:
+                    return False
+                else:
+                    self.skiprowsleft -= 1
+                    return True
+            self.skipfunc = dec_skiprows
         else:
             self.skipfunc = lambda x: x in self.skiprows
 
@@ -2652,21 +2664,17 @@ class PythonParser(ParserBase):
                 except IndexError:
                     raise StopIteration
         else:
-            while self.skipfunc(self.pos):
-                self.pos += 1
-                next(self.data)
-
             while True:
                 orig_line = self._next_iter_line(row_num=self.pos + 1)
                 self.pos += 1
-
                 if orig_line is not None:
                     line = self._check_comments([orig_line])[0]
-
                     if self.skip_blank_lines:
                         ret = self._remove_empty_lines([line])
 
                         if ret:
+                            if self.skipfunc(self.pos):
+                                continue
                             line = ret[0]
                             break
                     elif self._is_line_empty(orig_line) or line:
